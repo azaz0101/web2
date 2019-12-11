@@ -103,12 +103,12 @@ static void listener_cb(struct evconnlistener *listener, evutil_socket_t fd, str
     bufferevent_write(bev, MESSAGE, strlen(MESSAGE));
 }
 
-char acn[4][20] = {"user:aaa,pwd:aaa\n","user:bbb,pwd:bbb\n","user:ccc,pwd:ccc\n","user:ddd,pwd:ddd\n"};
-char usr[4][20] = {0};
+char acn[5][20] = {"user:aaa,pwd:aaa\n","user:bbb,pwd:bbb\n","user:ccc,pwd:ccc\n","user:ddd,pwd:ddd\n","none"};
+char usr[5][20] = {0};
 char board[] = {"___|___|___\n___|___|___\n   |   |   \n\n"};
 char tmp[] = {"___|___|___\n___|___|___\n   |   |   \n\n"};
 int mark[3][3];
-int status[4] = {0};
+int status[5] = {0};
 int match[2] = {-1,-1};
 int chs=-1,gus=-1,now=-1,cnt=0;
 
@@ -124,7 +124,7 @@ static void conn_readcb(struct bufferevent *bev, void *user_data){
 	
 	if (status[id] == 0){
 		char name[20] = {0};
-		for (i=0;i<4;i++){
+		for (i=0;i<5;i++){
 			if (strcmp(szBuffer,acn[i]) == 0){
 				status[id] = 1;	
 				strncpy(name,szBuffer+5,3);
@@ -136,7 +136,7 @@ static void conn_readcb(struct bufferevent *bev, void *user_data){
 		}
 	}
 	
-	if (status[id] == 0 && strcmp("login\n",szBuffer) != 0){
+	if (status[id] == 0 && strcmp("login\n",szBuffer) != 0 && strncmp("signup",szBuffer,6) != 0){
 		bufferevent_write(bev, "Please login first!\n", 20);
 	}
 	else if (strcmp("login\n",szBuffer) == 0){
@@ -146,10 +146,16 @@ static void conn_readcb(struct bufferevent *bev, void *user_data){
 		else
 			bufferevent_write(bev, "You are logged in!\n", 19);
 	}
+	else if (strncmp("signup", szBuffer, 6) == 0){
+		char info[50]={0};
+		strcpy(info, szBuffer+7);
+		strcpy(acn[4], info);
+		bufferevent_write(bev, "Sign up success!\n", 17);
+	}
 
 	if (status[id] == 1){
 		if (strcmp("ls\n",szBuffer) == 0){
-			for (i=0;i<4;i++)
+			for (i=0;i<5;i++)
 				if (status[i] >= 1)
 					bufferevent_write(bev, usr[i], strlen(usr[i]));
 		}
@@ -158,11 +164,42 @@ static void conn_readcb(struct bufferevent *bev, void *user_data){
 			memset(usr[id],'\0',sizeof(usr[id]));
 			bufferevent_write(bev, "Logout success!\n", 16);
 		}
+		else if (strncmp("pm",szBuffer,2) == 0){
+			char name[5]={0},msg[50]={0};
+			strncpy(name,szBuffer+3,3);
+			name[3] = '\0';
+			strcpy(msg, usr[id]);
+			msg[3] = '\0';
+			strcat(msg, " pm you : ");
+			strcat(msg, szBuffer+7);
+			int op_id=-1;
+			for (i=0;i<5;i++){
+				if (strncmp(usr[i],name,3) == 0){
+					op_id = i;
+					break;
+				}
+			}
+			write(op_id+7, msg, strlen(msg));
+		}
+		else if (strncmp("all",szBuffer,3) == 0){
+			char msg[30]={0};
+			char name[5]={0};
+			strcpy(name, usr[id]);
+			name[3] = '\0';
+			strcpy(msg, name);
+			strcat(msg, " : ");
+			strcat(msg, szBuffer+4);
+			for (i=0;i<5;i++){
+				if (status[i] == 1 && i != id){
+					write(i+7, msg, strlen(msg));
+				}
+			}
+		}
 		else if (strncmp("play",szBuffer,4) == 0){
 			int op_id=-1;
 			char op[10];
 			strcpy(op,szBuffer+5);
-			for (i=0;i<4;i++){
+			for (i=0;i<5;i++){
 				if (strcmp(usr[i],op) == 0){
 					op_id = i;
 					break;
@@ -189,7 +226,7 @@ static void conn_readcb(struct bufferevent *bev, void *user_data){
 			strncpy(p1,szBuffer,3);
 			p1[3] = '\0';
 			strcpy(p2,usr[id]);
-			for (i=0;i<4;i++){
+			for (i=0;i<5;i++){
 				if (strncmp(usr[i],p1,3) == 0){
 					op_id = i;
 					break;
